@@ -5,16 +5,25 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
-	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/eclipse/paho.mqtt.golang"
 )
 
 func main() {
+
 	c := newOneClient("192.168.1.240:1883")
+
 	c.Subscribe("equipment/#", 2, func(client mqtt.Client, message mqtt.Message) {
 		log.Infof("message:%v", string(message.Payload()))
 	})
+	//t := time.NewTicker(time.Second * 5)
+	//for range t.C {
+	//	p := pprof.Lookup("goroutine")
+	//
+	//	log.Infof("goroutine:%v", p.Count())
+	//	p.WriteTo(os.Stdout, 1)
+	//}
 	select {}
 }
 
@@ -26,15 +35,18 @@ func newOneClient(addr string) mqtt.Client {
 	opts.SetProtocolVersion(4)
 	opts.SetCleanSession(true)
 	opts.SetPingTimeout(10 * time.Second)
+	// connection lost callback
 	opts.SetConnectionLostHandler(func(client mqtt.Client, e error) {
 		log.Infof("error is :%v", e)
 		for {
+			// client not connectErr mqtt,need connectErr to server
 			if !client.IsConnectionOpen() {
-				if token := client.Connect(); token.Wait() && token.Error() != nil {
+				// until connectErr to server
+				if connectErr(client) {
 					log.Errorf("can not client mqtt server!! pelease check! address = %v", addr)
 				} else {
 
-					log.Infof("connect to mqtt server")
+					log.Infof("connectErr to mqtt server")
 
 					break
 				}
@@ -47,11 +59,15 @@ func newOneClient(addr string) mqtt.Client {
 		}
 	})
 	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatalf("can not connect mqtt server!! pelease check! address = %s!", addr)
+	if connectErr(client) {
+		log.Fatalf("can not connectErr mqtt server!! pelease check! address = %s!", addr)
 		client.Disconnect(250)
 	} else {
-		log.Warnf("connect to mqtt ok clientid = %s!", clientid)
+		log.Warnf("connectErr to mqtt ok clientid = %s!", clientid)
 	}
 	return client
+}
+func connectErr(client mqtt.Client) bool {
+	token := client.Connect()
+	return token.Wait() && token.Error() != nil
 }
